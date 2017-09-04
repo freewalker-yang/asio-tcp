@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
+#include <boost/thread.hpp>
 #include "connection.h"
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -15,6 +16,7 @@ void session_tcp::start(UINT clientid)
 }
 
 void session_tcp::do_read()
+
 {
 	boost::asio::async_read(socket_, boost::asio::buffer(&header_, HEADER_SIZE),
 		boost::bind(&session_tcp::handler_read_header, shared_from_this(),
@@ -60,7 +62,12 @@ void session_tcp::do_write()
 {
 
 	header_.packNum = curr_pack_num_++;
-	sending_ = true;
+
+	{
+		boost::mutex::scoped_lock lock1(cond_mutex_);
+		sending_ = true;
+	}
+	
 
 	//write header first
 	boost::asio::async_write(socket_, boost::asio::buffer(&header_, HEADER_SIZE),
@@ -95,11 +102,16 @@ void session_tcp::handler_write_msg(boost::system::error_code error)
 {
 	if (!error)
 	{
+		assert(sending_ == true);
+
 		{
-			WriteLock lock(mutex_);
+			boost::mutex::scoped_lock lock1(cond_mutex_);
 			std::cout << "write complete" << std::endl;
 			sending_ = false;
+			cond_.notify_one();
 		}
+
+		
 
 		do_read();
 
@@ -109,6 +121,27 @@ void session_tcp::handler_write_msg(boost::system::error_code error)
 		std::cout << "error occured" << std::endl;
 		conn_mgr_.leave(shared_from_this());
 	}
+} 
+
+bool session_tcp::wait_for_write(short millseconds)
+{
+	boost::mutex::scoped_lock lock1(cond_mutex_);
+
+	if (!sending_)
+	{
+		return true;
+	}
+	else
+	{
+		
+		while (sending_)
+		{
+			cond_.wait(lock1);
+		}
+
+		return true;
+	}
+		
 }
 
 int session_tcp::ProcessMsg(boost::system::error_code error)

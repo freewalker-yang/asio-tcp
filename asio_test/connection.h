@@ -64,6 +64,9 @@ public:
 	}
 
 private:
+
+	bool wait_for_write(short millseconds);
+
 	int ProcessMsg(boost::system::error_code error);
 
 	int ProcessConn();
@@ -87,6 +90,8 @@ private:
 
 	//add the mutex
 	boost::shared_mutex mutex_;
+	boost::mutex cond_mutex_;
+	boost::condition_variable cond_;
 };
 
 typedef boost::shared_ptr<session_tcp> connection_ptr;
