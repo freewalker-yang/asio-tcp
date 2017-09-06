@@ -1,5 +1,5 @@
-#ifndef _ECHOSERVER_H
-#define _ECHOSERVER_H
+#ifndef _CONNECTION_H
+#define _CONNECTION_H
 
 #include "../globlItem.h"
 #include <functional>
@@ -8,12 +8,66 @@
 #include <boost/thread/locks.hpp>
 #include <boost/shared_ptr.hpp>
 #include <set>
+#include <deque>
 
 typedef boost::shared_lock<boost::shared_mutex> ReadLock;
 typedef boost::unique_lock<boost::shared_mutex> WriteLock;
 
 typedef std::function<void(boost::system::error_code ec)> callback_t;
 class connection_mgr;
+
+class conn_msg : public boost::noncopyable
+{
+public:
+	
+	enum { max_body_length = 256 };
+
+	conn_msg(const HDR& header);
+	~conn_msg();
+
+	conn_msg* clone()
+	{
+		conn_msg* clone_obj = new conn_msg(header_);
+		clone_obj->set_body(body(), body_length());
+
+		return clone_obj;
+	}
+
+	char* body()
+	{
+		return buff_;
+	}
+
+	size_t body_length() const
+	{
+		return header_.len;
+	}
+
+	void body_length(size_t nSize);
+
+	char* header()
+	{
+		return (char*)(&header_);
+	}
+
+	size_t header_length() const
+	{
+		return HEADER_SIZE;
+	}
+
+	bool set_body(const boost::asio::streambuf& buf);
+	bool set_body(void* pData, size_t nSize);
+
+private:
+	char  buff_fix[max_body_length];
+	char* buff_;
+	size_t size_allocated_; //
+
+	HDR   header_; //the header info
+
+};
+
+typedef std::deque<conn_msg*> conn_message_queue;
 
 class session_tcp : public boost::enable_shared_from_this<session_tcp>
 {
@@ -27,7 +81,7 @@ public:
 	{
 		curr_pack_num_ = 0;
 		client_id_ = 0;
-		sending_ = false;
+	
 	}
 
 	~session_tcp()
@@ -45,9 +99,17 @@ public:
 		return socket_;
 	}
 
-public:
+	UINT client_id() const
+	{
+		return client_id_;
+	}
+
 	void start(UINT clientid);
 
+	void write(conn_msg* msg);
+
+private:
+	
 	void do_read();
 	void handler_read_header(boost::system::error_code error);
 	void handler_read_body(boost::system::error_code error);
@@ -55,16 +117,11 @@ public:
 	void do_write();
 	void handler_write_header(boost::system::error_code error);
 
-	void handler_write_msg(boost::system::error_code error);
-	void prepare_write();
-public:
-	UINT client_id() const
-	{
-		return client_id_;
-	}
+	void handler_write_body(boost::system::error_code error);
+	
 
 private:
-	int ProcessMsg(boost::system::error_code error);
+	int ProcessMsg();
 
 	int ProcessConn();
 	int ProcessData();
@@ -74,16 +131,17 @@ private:
 
 private:
 	boost::asio::ip::tcp::socket socket_;
-	boost::asio::streambuf buf_;
+	boost::asio::streambuf buf_; //buf to read
 
 	connection_mgr& conn_mgr_;
 
-	HDR  header_; //message header
+	HDR  header_; //message header to read
 	UINT curr_pack_num_; //current 
 	UINT client_id_;
+
 	//we can not send multiple data at one time
 	//should be one after one
-	bool sending_; //is sending or not
+	conn_message_queue msg_queue_;
 
 	//add the mutex
 	boost::shared_mutex mutex_;
@@ -108,6 +166,7 @@ public:
 
 	connection_ptr find(UINT clientid);
 	
+	void write_to_all(conn_msg* msg);
 
 private:
 	std::set<connection_ptr> connection_list_;
@@ -178,4 +237,4 @@ private:
 	char data_buff[max_length];
 };
 
-#endif //_ECHOSERVER_H
+#endif //_CONNECTION_H

@@ -10,6 +10,6 @@
 #include <stdio.h>
 #include <tchar.h>
 
-#include "globlItem.h"
+#include "../globlItem.h"
 
 // TODO: reference additional headers your program requires here

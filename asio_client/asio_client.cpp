@@ -21,26 +21,17 @@
 #include <boost\bind.hpp>
 #include <boost\thread.hpp>
 
+#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/locks.hpp>
+
 #define USE_TCP  0
 #define USE_UDP  1
 #define USE_TCPDCP  USE_TCP
 
-//包头
-typedef struct _header
-{
-	unsigned long len;	//数据长度
-	unsigned char type;	//包类型
-	unsigned char	subtype;
-	unsigned short  packNum; //包序号
-}HDR, *PHDER;
+typedef boost::shared_lock<boost::shared_mutex> ReadLock;
+typedef boost::unique_lock<boost::shared_mutex> WriteLock;
 
-const int HDR_LEN = sizeof(HDR);
-
-//the maximum and minimum size of package
-#define MINIMUMPACKAGESIZE sizeof(UINT)
-#define MAXIMUMPACKAGESIZE (1024*4)
-
-
+boost::shared_mutex mutex;
 
 enum { max_length = 1024*1024 };
 
@@ -76,8 +67,11 @@ void RunConnection(int num, char* argv[])
 	}
 
 	
-
-	cout << "thread " << num << ":connected" << endl;
+	{
+		WriteLock lock(mutex);
+		cout << "thread " << num << ":connected" << endl;
+	}
+	
 
 	/*if (error)
 	std::cout << boost::asio::;*/
@@ -97,7 +91,7 @@ void RunConnection(int num, char* argv[])
 	header.len = request_length;
 	
 	//first is the header
-	size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HDR_LEN));
+	size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
 
 	//then body
 	nSize += boost::asio::write(s, boost::asio::buffer(request, request_length));
@@ -136,7 +130,11 @@ void RunConnection(int num, char* argv[])
 
 		DWORD64 dwTick = tick_2 - tick_1;
 
-		cout << "num=[" << num << "]package recv[" << pHeader->packNum << "]" << dwTick/1000 << endl;
+		{
+			WriteLock lock(mutex);
+			cout << "num=[" << num << "]package recv[" << pHeader->packNum << "]" << dwTick / 1000 << endl;
+		}
+		
 
 		boost::this_thread::sleep(boost::posix_time::milliseconds(5));
 

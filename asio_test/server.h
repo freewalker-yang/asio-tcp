@@ -38,6 +38,11 @@ public:
 		start_accept();
 	}
 
+	void write_to_all(conn_msg* msg)
+	{
+		conn_mgr_.write_to_all(msg);
+	}
+
 private:
 	boost::asio::io_service& ios_;
 

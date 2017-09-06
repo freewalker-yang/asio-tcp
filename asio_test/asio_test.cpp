@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
+#include <boost/archive/binary_oarchive.hpp>
 
 #include "connection.h"
 #include "server.h"
@@ -34,20 +35,34 @@ int _tmain(int argc, char* argv[])
 		//io_service.run();
 
 		boost::thread t1(boost::bind(&(boost::asio::io_service::run), &io_service));
-		//boost::thread t2(boost::bind(&(boost::asio::io_service::run), &io_service));
-		//boost::thread t3(boost::bind(&(boost::asio::io_service::run), &io_service));
+		boost::thread t2(boost::bind(&(boost::asio::io_service::run), &io_service));
+		boost::thread t3(boost::bind(&(boost::asio::io_service::run), &io_service));
 
-		/*for (;;)
+		HDR header;
+		::ZeroMemory(&header, sizeof(header));
+		header.len = strlen("this is command string:")+4;
+
+		conn_msg msg(header);
+		boost::asio::streambuf buf;
+		size_t nCount = 0;
+		
+
+		for (;;)
 		{
+			boost::archive::binary_oarchive oa(buf);
+			oa << "this is command string:" << nCount;
 
+			msg.set_body(buf);
 
+			s.write_to_all(&msg);
 
+			nCount++;
 			boost::this_thread::sleep(boost::posix_time::milliseconds(20));
-		}*/
+		}
 
 		t1.join();
-		//t2.join();
-		//t3.join();
+		t2.join();
+		t3.join();
 	}
 	catch (std::exception& e)
 	{
