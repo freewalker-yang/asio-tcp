@@ -26,7 +26,6 @@ public:
 	{
 		if (!error)
 		{
-			std::cout << "new client accepted:" << std::endl;
 			new_session->start(curr_client_id_++);
 		}
 		else
@@ -41,6 +40,11 @@ public:
 	void write_to_all(conn_msg* msg)
 	{
 		conn_mgr_.write_to_all(msg);
+	}
+
+	size_t client_num()
+	{
+		return conn_mgr_.size();
 	}
 
 private:

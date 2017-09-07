@@ -3,11 +3,10 @@
 
 #include "stdafx.h"
 #include <iostream>
-#include <boost/bind.hpp>
-#include <boost/asio.hpp>
+#include <fstream>
 #include <boost/thread.hpp>
 
-#include <boost/archive/binary_oarchive.hpp>
+
 
 #include "connection.h"
 #include "server.h"
@@ -27,6 +26,7 @@ int _tmain(int argc, char* argv[])
 
 		boost::asio::io_service io_service;
 
+
 		using namespace std; // For atoi.
 		//server_tcp s(io_service, atoi(argv[1]));
 		//server_tcp s(io_service, atoi(argv[1]));
@@ -37,6 +37,7 @@ int _tmain(int argc, char* argv[])
 		boost::thread t1(boost::bind(&(boost::asio::io_service::run), &io_service));
 		boost::thread t2(boost::bind(&(boost::asio::io_service::run), &io_service));
 		boost::thread t3(boost::bind(&(boost::asio::io_service::run), &io_service));
+		boost::thread t4(boost::bind(&(boost::asio::io_service::run), &io_service));
 
 		HDR header;
 		::ZeroMemory(&header, sizeof(header));
@@ -49,6 +50,9 @@ int _tmain(int argc, char* argv[])
 
 		for (;;)
 		{
+			//first clear the content
+			buf.consume(buf.size());
+
 			boost::archive::binary_oarchive oa(buf);
 			oa << "this is command string:" << nCount;
 
@@ -56,13 +60,21 @@ int _tmain(int argc, char* argv[])
 
 			s.write_to_all(&msg);
 
-			nCount++;
-			boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+			//nCount++;
+			boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+			if (s.client_num() >= 10)
+			{
+				nCount++;
+				if (nCount > 5)
+					break;
+			}
 		}
 
 		t1.join();
 		t2.join();
 		t3.join();
+		t4.join();
 	}
 	catch (std::exception& e)
 	{

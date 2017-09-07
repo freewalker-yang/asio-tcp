@@ -5,16 +5,20 @@
 #include <functional>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/shared_ptr.hpp>
 #include <set>
 #include <deque>
+#include <boost/circular_buffer.hpp>
 
 typedef boost::shared_lock<boost::shared_mutex> ReadLock;
 typedef boost::unique_lock<boost::shared_mutex> WriteLock;
 
 typedef std::function<void(boost::system::error_code ec)> callback_t;
 class connection_mgr;
+
+extern boost::mutex g_mutex_IO;
 
 class conn_msg : public boost::noncopyable
 {
@@ -25,13 +29,13 @@ public:
 	conn_msg(const HDR& header);
 	~conn_msg();
 
-	conn_msg* clone()
+	/*conn_msg* clone()
 	{
 		conn_msg* clone_obj = new conn_msg(header_);
 		clone_obj->set_body(body(), body_length());
 
 		return clone_obj;
-	}
+	}*/
 
 	char* body()
 	{
@@ -43,11 +47,21 @@ public:
 		return header_.len;
 	}
 
+	size_t capacity() const
+	{
+		return size_allocated_ > 0 ? size_allocated_ : max_body_length;
+	}
+
 	void body_length(size_t nSize);
 
 	char* header()
 	{
 		return (char*)(&header_);
+	}
+
+	void header(HDR& header)
+	{
+		header = header_;
 	}
 
 	size_t header_length() const
@@ -61,13 +75,15 @@ public:
 private:
 	char  buff_fix[max_body_length];
 	char* buff_;
-	size_t size_allocated_; //
+	size_t size_allocated_; //size allocated
 
 	HDR   header_; //the header info
 
 };
 
 typedef std::deque<conn_msg*> conn_message_queue;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 class session_tcp : public boost::enable_shared_from_this<session_tcp>
 {
@@ -108,6 +124,9 @@ public:
 
 	void write(conn_msg* msg);
 
+	bool output_console(char* msg);
+	bool output_console(const std::string& str);
+
 private:
 	
 	void do_read();
@@ -116,13 +135,11 @@ private:
 
 	void do_write();
 	void handler_write_header(boost::system::error_code error);
-
 	void handler_write_body(boost::system::error_code error);
 	
 
 private:
 	int ProcessMsg();
-
 	int ProcessConn();
 	int ProcessData();
 	int ProcessCommand();
@@ -152,6 +169,8 @@ typedef boost::shared_ptr<session_tcp> connection_ptr;
 class connection_mgr : public boost::noncopyable
 {
 public:
+	connection_mgr();
+
 	void join(connection_ptr incomer)
 	{
 		WriteLock lock(mutex_);
@@ -165,6 +184,16 @@ public:
 	}
 
 	connection_ptr find(UINT clientid);
+
+	//allocate the msg buffer 
+	conn_msg* allocate_msg_buffer(const HDR& header);
+	void dellocate_msg_buffer(conn_msg* msg);
+
+	size_t size()
+	{
+		ReadLock lock(mutex_);
+		return connection_list_.size();
+	}
 	
 	void write_to_all(conn_msg* msg);
 
@@ -172,6 +201,10 @@ private:
 	std::set<connection_ptr> connection_list_;
 
 	boost::shared_mutex mutex_;
+	boost::shared_mutex buffer_mutex_;
+
+
+	boost::circular_buffer<conn_msg*> conn_msg_buffer_;
 };
 
 using boost::asio::ip::udp;

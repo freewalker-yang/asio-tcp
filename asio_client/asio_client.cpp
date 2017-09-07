@@ -28,12 +28,14 @@
 #define USE_UDP  1
 #define USE_TCPDCP  USE_TCP
 
+#define LOG_RECV_ENABLE  1
+
 typedef boost::shared_lock<boost::shared_mutex> ReadLock;
 typedef boost::unique_lock<boost::shared_mutex> WriteLock;
 
 boost::shared_mutex mutex;
 
-enum { max_length = 1024*1024 };
+enum { max_length = 1024*1024 }; //1M
 
 void RunConnection(int num, char* argv[])
 {
@@ -83,57 +85,67 @@ void RunConnection(int num, char* argv[])
 	_stprintf_s(request, max_length, "thread %d:here is the message i deliver to you!", num);
 	
 
-	HDR header;
+	HDR header, header_rcv;
 	memset(&header, 0, sizeof(header));
+	memset(&header_rcv, 0, sizeof(header_rcv));
 
 	size_t request_length = max_length - sizeof(header); // strlen(request);
 
 	header.len = request_length;
 	
-	//first is the header
-	size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
+	
 
-	//then body
-	nSize += boost::asio::write(s, boost::asio::buffer(request, request_length));
-
-	char* reply = new char[max_length];
-	int nTotalCnt = 20, nCount = 0;
+	//char* reply = new char[max_length];
+	int nTotalCnt = 100, nCount = 0;
 	DWORD64 tick_1, tick_2;
+	boost::asio::streambuf buf;
+	size_t nPackCnt = 0;
 
 	do
 	{
+		header.packNum++;
+
+		//first is the header
+		size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
+
+		//then body
+		nSize += boost::asio::write(s, boost::asio::buffer(request, request_length));
+
 
 		tick_1 = GetTickCount64();
 
 		size_t reply_length = 0, nLen = 0;
-		
-		while (reply_length < nSize)
-		{
-			//nLen = boost::asio::read(s, boost::asio::buffer(reply + reply_length, max_length - reply_length));
-			nLen = s.read_some(boost::asio::buffer(reply + reply_length, max_length - reply_length));
-			//nLen = recv(s.read_some, reply + reply_length, max_length - reply_length, 0);
-
-			reply_length += nLen;
-		}
 
 		
 
-		//first is the header
-		PHDER pHeader = (PHDER)reply;
+		//first read the header
+		reply_length = boost::asio::read(s, boost::asio::buffer(&header_rcv, HEADER_SIZE));
+		//buf.prepare(header.len);
+		assert(reply_length == HEADER_SIZE);
+		reply_length = boost::asio::read(s, buf, boost::asio::transfer_exactly(header_rcv.len));
+		assert(reply_length == header_rcv.len);
 
-		
+		nPackCnt++;
 
-		pHeader->packNum++;
-		boost::asio::write(s, boost::asio::buffer(reply, nSize));
+		//nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
+		//assert(nSize == HEADER_SIZE);
+		////then body	
+		//nSize = boost::asio::write(s, buf, boost::asio::transfer_exactly(header.len));
+		//assert(nSize == header.len);
+
+		buf.consume(buf.size());
 
 		tick_2 = GetTickCount64();
 
 		DWORD64 dwTick = tick_2 - tick_1;
 
+#if LOG_RECV_ENABLE == 1
 		{
 			WriteLock lock(mutex);
-			cout << "num=[" << num << "]package recv[" << pHeader->packNum << "]" << dwTick / 1000 << endl;
+			cout << "id=[" << num << "]package recv[len=" << header.len;
+			cout << ", index=" << nPackCnt << "]" << endl;
 		}
+#endif //LOG_RECV_ENABLE
 		
 
 		boost::this_thread::sleep(boost::posix_time::milliseconds(5));
@@ -171,7 +183,14 @@ void RunConnection(int num, char* argv[])
 	}
 	catch (std::exception& e)
 	{
-		std::cerr << "Exception: " << e.what() << "\n";
+		WriteLock lock(mutex);
+		std::cerr << "thread " << num << ":Exception: " << e.what() << "\n";
+		return;
+	}
+
+	{
+		WriteLock lock(mutex);
+		std::cout << "thread " << num << ":exit" << std::endl;
 	}
 }
 
@@ -196,7 +215,7 @@ int _tmain(int argc, char* argv[])
 
 		DWORD tick = GetTickCount() - tick_1;
 
-		std::cout << "finished in" << tick << " ms" << std::endl;
+		std::cout << "finished in " << tick << " ms" << std::endl;
 	
 		system("pause");
 

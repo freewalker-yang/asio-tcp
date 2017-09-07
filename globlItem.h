@@ -1,6 +1,8 @@
 #ifndef GLOBLA_ITEM_H
 #define GLOBAL_ITEM_H
 
+#include <string>
+
 typedef unsigned int UINT;
 typedef unsigned char BYTE;
 
@@ -15,5 +17,7 @@ typedef struct _header
 }HDR, *PHDER;
 
 const int HEADER_SIZE = sizeof(HDR);
+
+void std_string_format(std::string & _str, const char * _Format, ...);
 
 #endif //
