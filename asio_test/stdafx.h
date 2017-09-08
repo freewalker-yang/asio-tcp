@@ -11,7 +11,7 @@
 #include <tchar.h>
 #include <iostream>
 
-
+#include "../globlItem.h"
 
 // TODO: reference additional headers your program requires here
 #include <boost/bind.hpp>

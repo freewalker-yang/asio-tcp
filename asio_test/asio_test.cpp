@@ -28,17 +28,24 @@ int _tmain(int argc, char* argv[])
 
 
 		using namespace std; // For atoi.
-		//server_tcp s(io_service, atoi(argv[1]));
-		//server_tcp s(io_service, atoi(argv[1]));
-		server_tcp s(io_service, 4567);
+
+		server_tcp s(io_service, 4);
+		s.start(4567);
 
 		//io_service.run();
 
+#if IO_THREAD_IN_CLASS == 0
 		boost::thread t1(boost::bind(&(boost::asio::io_service::run), &io_service));
 		boost::thread t2(boost::bind(&(boost::asio::io_service::run), &io_service));
 		boost::thread t3(boost::bind(&(boost::asio::io_service::run), &io_service));
 		boost::thread t4(boost::bind(&(boost::asio::io_service::run), &io_service));
 
+		t1.join();
+		t2.join();
+		t3.join();
+		t4.join();
+
+#else
 		HDR header;
 		::ZeroMemory(&header, sizeof(header));
 		header.len = strlen("this is command string:")+4;
@@ -66,15 +73,13 @@ int _tmain(int argc, char* argv[])
 			if (s.client_num() >= 10)
 			{
 				nCount++;
-				if (nCount > 5)
+				if (nCount > 2)
 					break;
 			}
 		}
+#endif //
 
-		t1.join();
-		t2.join();
-		t3.join();
-		t4.join();
+		
 	}
 	catch (std::exception& e)
 	{

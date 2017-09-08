@@ -1,7 +1,7 @@
 #ifndef _CONNECTION_H
 #define _CONNECTION_H
 
-#include "../globlItem.h"
+
 #include <functional>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/thread/shared_mutex.hpp>
@@ -26,6 +26,8 @@ public:
 	
 	enum { max_body_length = 256 };
 
+	//the size speficied in header.len can changed in set_body function 
+	//later(the header only speficy the package type)
 	conn_msg(const HDR& header);
 	~conn_msg();
 

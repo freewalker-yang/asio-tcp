@@ -205,7 +205,7 @@ void session_tcp::handler_read_header(boost::system::error_code error)
 		
 		
 		std::string str;
-		std_string_format(str, "handler_read_header:len=%d", header_.len);
+		std_string_format(str, "handler_read_header:len = %d", header_.len);
 		output_console(str);
 		
 		buf_.prepare(header_.len);
@@ -233,7 +233,7 @@ void session_tcp::handler_read_body(boost::system::error_code error)
 	{
 	
 		std::string str;
-		std_string_format(str, "new msg received:size=%d", header_.len);
+		std_string_format(str, "new msg received : size = %d", header_.len);
 		output_console(str);
 
 		//then process the msg
@@ -438,7 +438,7 @@ int session_tcp::ProcessPulse()
 /////////////////////////////////////////////////////////////////////////////////
 connection_mgr::connection_mgr()
 {
-	conn_msg_buffer_.set_capacity(100);
+	conn_msg_buffer_.set_capacity(50);
 }
 
 connection_ptr connection_mgr::find(UINT clientid)
@@ -473,6 +473,7 @@ conn_msg* connection_mgr::allocate_msg_buffer(const HDR& header)
 {
 	conn_msg* ret = NULL;
 
+#if MSG_BUFFER_ALLOCATOR == 1
 	//pick up any item can meet the requirements
 	if (header.len <= conn_msg::max_body_length)
 	{
@@ -486,11 +487,22 @@ conn_msg* connection_mgr::allocate_msg_buffer(const HDR& header)
 		{
 			lock_read.unlock();
 
-			WriteLock lock(buffer_mutex_);
+			{
+				WriteLock lock(buffer_mutex_);
 
-			ret = conn_msg_buffer_.front();
-			conn_msg_buffer_.pop_front();
-			return ret;
+				if (conn_msg_buffer_.empty())
+				{
+					lock.unlock();
+					ret = new conn_msg(header);
+					return ret;
+				}
+				else
+				{
+					ret = conn_msg_buffer_.front();
+					conn_msg_buffer_.pop_front();
+					return ret;
+				}
+			}
 		}
 	}
 	else //customized size
@@ -498,6 +510,10 @@ conn_msg* connection_mgr::allocate_msg_buffer(const HDR& header)
 		ret = new conn_msg(header);
 		return ret;
 	}
+#else
+	ret = new conn_msg(header);
+	return ret;
+#endif //MSG_BUFFER_ALLOCATOR
 }
 
 void connection_mgr::dellocate_msg_buffer(conn_msg* msg)
@@ -508,6 +524,7 @@ void connection_mgr::dellocate_msg_buffer(conn_msg* msg)
 		return;
 	}
 
+#if MSG_BUFFER_ALLOCATOR == 1
 	if (msg->capacity() == conn_msg::max_body_length)
 	{
 		ReadLock lock_read(buffer_mutex_);
@@ -520,14 +537,28 @@ void connection_mgr::dellocate_msg_buffer(conn_msg* msg)
 		{
 			lock_read.unlock();
 
-			WriteLock lock(buffer_mutex_);
-			conn_msg_buffer_.push_back(msg);
+			{
+				WriteLock lock(buffer_mutex_);
+
+				if (conn_msg_buffer_.full())
+				{
+					lock.unlock();
+					delete msg;
+				}
+				else
+				{
+					conn_msg_buffer_.push_back(msg);
+				}
+			}
 		}
 	}
 	else  //customize size, free it
 	{
 		delete msg;
 	}
+#else
+	delete msg;
+#endif //#if MSG_BUFFER_ALLOCATOR == 1
 }
 
 void connection_mgr::write_to_all(conn_msg* msg)

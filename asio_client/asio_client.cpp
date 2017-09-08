@@ -93,7 +93,10 @@ void RunConnection(int num, char* argv[])
 
 	header.len = request_length;
 	
-	
+	//first is the header
+	size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
+	//then body
+	nSize += boost::asio::write(s, boost::asio::buffer(request, request_length));
 
 	//char* reply = new char[max_length];
 	int nTotalCnt = 100, nCount = 0;
@@ -105,11 +108,7 @@ void RunConnection(int num, char* argv[])
 	{
 		header.packNum++;
 
-		//first is the header
-		size_t nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
-
-		//then body
-		nSize += boost::asio::write(s, boost::asio::buffer(request, request_length));
+	
 
 
 		tick_1 = GetTickCount64();
@@ -127,11 +126,11 @@ void RunConnection(int num, char* argv[])
 
 		nPackCnt++;
 
-		//nSize = boost::asio::write(s, boost::asio::buffer(&header, HEADER_SIZE));
-		//assert(nSize == HEADER_SIZE);
-		////then body	
-		//nSize = boost::asio::write(s, buf, boost::asio::transfer_exactly(header.len));
-		//assert(nSize == header.len);
+		nSize = boost::asio::write(s, boost::asio::buffer(&header_rcv, HEADER_SIZE));
+		assert(nSize == HEADER_SIZE);
+		//then body	
+		nSize = boost::asio::write(s, buf, boost::asio::transfer_exactly(header_rcv.len));
+		assert(nSize == header_rcv.len);
 
 		buf.consume(buf.size());
 
@@ -142,7 +141,7 @@ void RunConnection(int num, char* argv[])
 #if LOG_RECV_ENABLE == 1
 		{
 			WriteLock lock(mutex);
-			cout << "id=[" << num << "]package recv[len=" << header.len;
+			cout << "id=[" << num << "]package recv[len=" << header_rcv.len;
 			cout << ", index=" << nPackCnt << "]" << endl;
 		}
 #endif //LOG_RECV_ENABLE
