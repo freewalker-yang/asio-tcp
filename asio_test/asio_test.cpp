@@ -24,12 +24,12 @@ int _tmain(int argc, char* argv[])
 			return 1;
 		}*/
 
-		boost::asio::io_service io_service;
+		//boost::asio::io_service io_service;
 
 
 		using namespace std; // For atoi.
 
-		server_tcp s(io_service, 4);
+		server_tcp s(4);
 		s.start(4567);
 
 		//io_service.run();
@@ -46,37 +46,50 @@ int _tmain(int argc, char* argv[])
 		t4.join();
 
 #else
-		HDR header;
-		::ZeroMemory(&header, sizeof(header));
-		header.len = strlen("this is command string:")+4;
+		//HDR header;
+		//::ZeroMemory(&header, sizeof(header));
+		//header.len = strlen("this is command string:")+4;
 
-		conn_msg msg(header);
-		boost::asio::streambuf buf;
-		size_t nCount = 0;
-		
+		//conn_msg msg(header);
+		//boost::asio::streambuf buf;
+		//size_t nCount = 0;
+		//
+
+		//for (;;)
+		//{
+		//	//first clear the content
+		//	buf.consume(buf.size());
+
+		//	boost::archive::binary_oarchive oa(buf);
+		//	oa << "this is command string:" << nCount;
+
+		//	msg.set_body(buf);
+
+		//	s.write_to_all(&msg);
+
+		//	//nCount++;
+		//	boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+		//	/*if (s.client_num() >= 10)
+		//	{
+		//		nCount++;
+		//		if (nCount > 2)
+		//			break;
+		//	}*/
+		//}
+
+		boost::this_thread::sleep(boost::posix_time::seconds(50));
+
+
+		s.stop();
+
+		s.start(4567);
 
 		for (;;)
 		{
-			//first clear the content
-			buf.consume(buf.size());
-
-			boost::archive::binary_oarchive oa(buf);
-			oa << "this is command string:" << nCount;
-
-			msg.set_body(buf);
-
-			s.write_to_all(&msg);
-
-			//nCount++;
-			boost::this_thread::sleep(boost::posix_time::milliseconds(100));
-
-			if (s.client_num() >= 10)
-			{
-				nCount++;
-				if (nCount > 2)
-					break;
-			}
+			boost::this_thread::sleep(boost::posix_time::milliseconds(10));
 		}
+
 #endif //
 
 		

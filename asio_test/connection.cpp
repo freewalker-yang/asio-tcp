@@ -30,6 +30,33 @@ void std_string_format(std::string & _str, const char * _Format, ...)
 	
 }
 
+void output_console(const char * _Format, ...)
+{
+	std::string tmp;
+
+	va_list marker = NULL;
+	va_start(marker, _Format);
+
+	size_t num_of_chars = _vscprintf(_Format, marker);
+
+	if (num_of_chars > tmp.capacity()) {
+		tmp.resize(num_of_chars + 1);
+	}
+
+	vsprintf_s((char *)tmp.data(), tmp.capacity(), _Format, marker);
+
+	va_end(marker);
+
+	{
+		boost::mutex::scoped_lock lock(g_mutex_IO);
+
+		std::cout << tmp.c_str() << std::endl;
+	}
+	
+
+
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 conn_msg::conn_msg(const HDR& header)
 	: buff_(NULL)
@@ -116,6 +143,12 @@ void session_tcp::start(UINT clientid)
 {
 	client_id_ = clientid;
 
+#ifdef _DEBUG
+	output_console("session_tcp::start[this = 0x%x].", this);
+#else
+	output_console("new client accepted");
+#endif
+
 	conn_mgr_.join(shared_from_this());
 
 	//{
@@ -123,23 +156,43 @@ void session_tcp::start(UINT clientid)
 	//	boost::mutex::scoped_lock lock(g_mutex_IO);
 	//	std::cout << "new client accepted:id=" << client_id_ << std::endl;
 	//}
-	output_console("new client accepted");
+	
 	
 
 	//initiate the header read
 	do_read();
 }
 
-bool session_tcp::output_console(char* msg)
+bool session_tcp::output_console(const char * _Format, ...)
 {
-	boost::mutex::scoped_lock lock(g_mutex_IO);
 	unsigned long thread_id = ::GetCurrentThreadId();
 
-	std::string strPrefix;
+	std::string strPrefix, tmp;
 	std_string_format(strPrefix, "thread[%5d] - id[%2d] : ", thread_id, client_id_);
 
-	std::cout << strPrefix.c_str();
-	std::cout << msg << std::endl;
+	va_list marker = NULL;
+	va_start(marker, _Format);
+
+	size_t num_of_chars = _vscprintf(_Format, marker);
+
+	if (num_of_chars > tmp.capacity()) {
+		tmp.resize(num_of_chars + 1);
+	}
+
+	vsprintf_s((char *)tmp.data(), tmp.capacity(), _Format, marker);
+
+	va_end(marker);
+
+	{
+		boost::mutex::scoped_lock lock(g_mutex_IO);
+		std::cout << strPrefix.c_str();
+		std::cout << tmp.c_str() << std::endl;
+	}
+	
+
+	
+
+
 
 	return true;
 }
@@ -440,6 +493,58 @@ connection_mgr::connection_mgr()
 {
 	conn_msg_buffer_.set_capacity(50);
 }
+
+//to disconnect all the clients
+void connection_mgr::stop()
+{	
+	WriteLock lock(mutex_);
+
+	std::set<connection_ptr>::iterator it = connection_list_.begin();
+	for (; it != connection_list_.end(); ++it)
+	{
+		session_tcp* client = it->get();
+		if (client == NULL)
+		{
+			//ERROR
+			continue;
+		}
+
+		boost::asio::ip::tcp::socket& socket_ = client->socket();
+
+		boost::system::error_code ec;
+		
+		//socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+		if (ec)
+		{
+			output_console("error = %d in client socket shutdown(info=%s).", ec, ec.message());
+			continue;
+		}
+
+		socket_.cancel();
+		socket_.close();
+	}
+
+	connection_list_.clear();
+
+}
+
+void connection_mgr::clear_buffer()
+{
+	WriteLock lock(mutex_);
+
+	size_t nSize = conn_msg_buffer_.size();
+	output_console("clear_buffer in connection_mgr : size = %d", nSize);
+
+	boost::circular_buffer<conn_msg*>::iterator it = conn_msg_buffer_.begin();
+	for (; it != conn_msg_buffer_.end(); ++it)
+	{
+		delete *it;
+	}
+
+	conn_msg_buffer_.clear();
+}
+
+
 
 connection_ptr connection_mgr::find(UINT clientid)
 {

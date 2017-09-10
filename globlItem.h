@@ -23,5 +23,6 @@ typedef struct _header
 const int HEADER_SIZE = sizeof(HDR);
 
 void std_string_format(std::string & _str, const char * _Format, ...);
+void output_console(const char * _Format, ...);
 
 #endif //

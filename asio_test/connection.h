@@ -100,11 +100,16 @@ public:
 		curr_pack_num_ = 0;
 		client_id_ = 0;
 	
+#ifdef _DEBUG
+		output_console("session_tcp constructor[this = 0x%x].", this);
+#endif
 	}
 
 	~session_tcp()
 	{
-		
+#ifdef _DEBUG
+		output_console("session_tcp destructor[this = 0x%x].", this);
+#endif
 	}
 
 	static pointer create(boost::asio::io_service& ios, connection_mgr& conn_mgr)
@@ -114,6 +119,7 @@ public:
 
 	boost::asio::ip::tcp::socket& socket()
 	{
+		ReadLock lock(mutex_);
 		return socket_;
 	}
 
@@ -126,8 +132,12 @@ public:
 
 	void write(conn_msg* msg);
 
-	bool output_console(char* msg);
+	bool output_console(const char * _Format, ...);
 	bool output_console(const std::string& str);
+
+public:
+
+	
 
 private:
 	
@@ -185,6 +195,12 @@ public:
 		connection_list_.erase(outcomer);
 	}
 
+	//stop : to disconnect all the clients
+	void stop();
+
+	//clear the msg buffer in circular buffer
+	void clear_buffer();
+
 	connection_ptr find(UINT clientid);
 
 	//allocate the msg buffer 
@@ -209,67 +225,67 @@ private:
 	boost::circular_buffer<conn_msg*> conn_msg_buffer_;
 };
 
-using boost::asio::ip::udp;
+//using boost::asio::ip::udp;
 
-//server for udp
-class server_udp
-{
-	
-
-public:
-	server_udp(boost::asio::io_service& ios, short port)
-		:ios_(ios)
-		, socket_(ios, udp::endpoint(udp::v4(), port))
-	{
-		start();
-	}
-
-	void start()
-	{
-		socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
-			sender_endpoint_,
-			boost::bind(&server_udp::handler_read, this,
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred));
-	}
-
-	void handler_read(const boost::system::error_code error, size_t byte_recv)
-	{
-		if (!error && byte_recv > 0)
-		{
-			socket_.async_send_to(boost::asio::buffer(data_buff, byte_recv),
-				sender_endpoint_, 
-				boost::bind(&server_udp::handler_write, this,
-				boost::asio::placeholders::error,
-				boost::asio::placeholders::bytes_transferred));
-		}
-		else
-		{
-			socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
-				sender_endpoint_,
-				boost::bind(&server_udp::handler_write, 
-				this, boost::asio::placeholders::error,
-				boost::asio::placeholders::bytes_transferred));
-		}
-	}
-
-	void handler_write(const boost::system::error_code error, size_t /*byte_send*/)
-	{
-		socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
-			sender_endpoint_,
-			boost::bind(&server_udp::handler_write,
-			this, boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred));
-	}
-	
-
-private:
-	boost::asio::io_service& ios_;
-	udp::endpoint sender_endpoint_;
-
-	udp::socket socket_;
-	enum { max_length = 1024 };
-	char data_buff[max_length];
-};
+////server for udp
+//class server_udp
+//{
+//	
+//
+//public:
+//	server_udp(boost::asio::io_service& ios, short port)
+//		:ios_(ios)
+//		, socket_(ios, udp::endpoint(udp::v4(), port))
+//	{
+//		start();
+//	}
+//
+//	void start()
+//	{
+//		socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
+//			sender_endpoint_,
+//			boost::bind(&server_udp::handler_read, this,
+//			boost::asio::placeholders::error,
+//			boost::asio::placeholders::bytes_transferred));
+//	}
+//
+//	void handler_read(const boost::system::error_code error, size_t byte_recv)
+//	{
+//		if (!error && byte_recv > 0)
+//		{
+//			socket_.async_send_to(boost::asio::buffer(data_buff, byte_recv),
+//				sender_endpoint_, 
+//				boost::bind(&server_udp::handler_write, this,
+//				boost::asio::placeholders::error,
+//				boost::asio::placeholders::bytes_transferred));
+//		}
+//		else
+//		{
+//			socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
+//				sender_endpoint_,
+//				boost::bind(&server_udp::handler_write, 
+//				this, boost::asio::placeholders::error,
+//				boost::asio::placeholders::bytes_transferred));
+//		}
+//	}
+//
+//	void handler_write(const boost::system::error_code error, size_t /*byte_send*/)
+//	{
+//		socket_.async_receive_from(boost::asio::buffer(data_buff, max_length),
+//			sender_endpoint_,
+//			boost::bind(&server_udp::handler_write,
+//			this, boost::asio::placeholders::error,
+//			boost::asio::placeholders::bytes_transferred));
+//	}
+//	
+//
+//private:
+//	boost::asio::io_service& ios_;
+//	udp::endpoint sender_endpoint_;
+//
+//	udp::socket socket_;
+//	enum { max_length = 1024 };
+//	char data_buff[max_length];
+//};
 
 #endif //_CONNECTION_H
