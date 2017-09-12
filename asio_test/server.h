@@ -11,10 +11,12 @@ public:
 
 	enum { max_io_thread = 10 };
 
-	server_tcp(unsigned int io_thread_num = boost::thread::hardware_concurrency())
-		:acceptor_(ios_)
+	server_tcp(UINT max_conn,
+		UINT io_thread_num = boost::thread::hardware_concurrency())
+		: acceptor_(ios_)
 		, curr_client_id_(1)
 		, io_thread_num_(io_thread_num)
+		, conn_mgr_(max_conn)
 	{
 		
 		assert(io_thread_num_ <= max_io_thread);
@@ -40,6 +42,11 @@ public:
 		return conn_mgr_.size();
 	}
 
+	connection_mgr& conn_mgr()
+	{
+		return conn_mgr_;
+	}
+
 private:
 	void start_accept()
 	{
@@ -54,7 +61,20 @@ private:
 	{
 		if (!error)
 		{
-			new_session->start(curr_client_id_++);
+			if (conn_mgr_.can_join())
+			{
+				new_session->start(curr_client_id_++);
+			}
+			else
+			{
+				//failed to join, exceed max connections
+				//long count_org = new_session.use_count();
+				//new_session.reset();
+				//long count_aft = new_session.use_count();
+
+				output_console("server_tcp::connection refused [this = 0x%x].", new_session.get());
+			}
+			
 		}
 		else
 		{

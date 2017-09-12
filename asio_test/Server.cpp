@@ -18,18 +18,16 @@ void server_tcp::start(int port)
 
 	output_console("the server start to listen.");
 
+	curr_client_id_ = 1; //reset the current id
+
 	start_accept();
 
-#if IO_THREAD_IN_CLASS == 1
 	io_thread_array_.resize(io_thread_num_);
 
 	for (UINT i = 0; i < io_thread_num_; i++)
 	{
 		io_thread_array_[i] = new boost::thread(boost::bind(&(boost::asio::io_service::run), &ios_));
 	}
-
-#endif //IO_THREAD_IN_CLASS
-
 
 }
 
@@ -45,7 +43,6 @@ void server_tcp::stop()
 
 	ios_.stop();
 
-#if IO_THREAD_IN_CLASS == 1
 	for (UINT i = 0; i < io_thread_num_; i++)
 	{
 		io_thread_array_[i]->join();
@@ -59,6 +56,4 @@ void server_tcp::stop()
 
 	conn_mgr_.clear_buffer();
 
-
-#endif //IO_THREAD_IN_CLASS
 }

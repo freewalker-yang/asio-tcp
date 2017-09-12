@@ -29,23 +29,11 @@ int _tmain(int argc, char* argv[])
 
 		using namespace std; // For atoi.
 
-		server_tcp s(4);
+		server_tcp s(18, 4);
 		s.start(4567);
 
 		//io_service.run();
 
-#if IO_THREAD_IN_CLASS == 0
-		boost::thread t1(boost::bind(&(boost::asio::io_service::run), &io_service));
-		boost::thread t2(boost::bind(&(boost::asio::io_service::run), &io_service));
-		boost::thread t3(boost::bind(&(boost::asio::io_service::run), &io_service));
-		boost::thread t4(boost::bind(&(boost::asio::io_service::run), &io_service));
-
-		t1.join();
-		t2.join();
-		t3.join();
-		t4.join();
-
-#else
 		//HDR header;
 		//::ZeroMemory(&header, sizeof(header));
 		//header.len = strlen("this is command string:")+4;
@@ -90,7 +78,6 @@ int _tmain(int argc, char* argv[])
 			boost::this_thread::sleep(boost::posix_time::milliseconds(10));
 		}
 
-#endif //
 
 		
 	}

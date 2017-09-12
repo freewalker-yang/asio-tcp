@@ -64,7 +64,9 @@ conn_msg::conn_msg(const HDR& header)
 {
 	header_ = header;
 	
-	
+#ifdef _DEBUG
+	output_console("conn_msg constructor[this = 0x%x].", this);
+#endif //
 }
 
 conn_msg::~conn_msg()
@@ -74,6 +76,10 @@ conn_msg::~conn_msg()
 		delete[] buff_;
 		buff_ = NULL;
 	}
+
+#ifdef _DEBUG
+	output_console("conn_msg destructor[this = 0x%x].", this);
+#endif //
 }
 
 void conn_msg::body_length(size_t nSize)
@@ -149,15 +155,13 @@ void session_tcp::start(UINT clientid)
 	output_console("new client accepted");
 #endif
 
-	conn_mgr_.join(shared_from_this());
-
-	//{
-	//	//boost::unique_lock<boost::mutex> lock(g_mutex_IO);
-	//	boost::mutex::scoped_lock lock(g_mutex_IO);
-	//	std::cout << "new client accepted:id=" << client_id_ << std::endl;
-	//}
-	
-	
+	bool bJoin = conn_mgr_.join(shared_from_this());
+	if (!bJoin)
+	{
+		//failed to join
+		assert(false);
+		return;
+	}
 
 	//initiate the header read
 	do_read();
@@ -257,9 +261,9 @@ void session_tcp::handler_read_header(boost::system::error_code error)
 		//std::cout << "read header bytes" << header_.len << std::endl;
 		
 		
-		std::string str;
+		/*std::string str;
 		std_string_format(str, "handler_read_header:len = %d", header_.len);
-		output_console(str);
+		output_console(str);*/
 		
 		buf_.prepare(header_.len);
 
@@ -426,7 +430,7 @@ void session_tcp::handler_write_body(boost::system::error_code error)
 int session_tcp::ProcessMsg()
 {
 
-	////header is header_ and body is buf_
+	////header is just header_ and body is buf_
 	int nRet = 0;
 
 	//here we only echo back the msg
@@ -489,7 +493,8 @@ int session_tcp::ProcessPulse()
 }
 
 /////////////////////////////////////////////////////////////////////////////////
-connection_mgr::connection_mgr()
+connection_mgr::connection_mgr(UINT max_conn)
+	: max_conn_(max_conn)
 {
 	conn_msg_buffer_.set_capacity(50);
 }
@@ -513,7 +518,7 @@ void connection_mgr::stop()
 
 		boost::system::error_code ec;
 		
-		//socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+		socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
 		if (ec)
 		{
 			output_console("error = %d in client socket shutdown(info=%s).", ec, ec.message());

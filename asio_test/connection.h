@@ -123,8 +123,9 @@ public:
 		return socket_;
 	}
 
-	UINT client_id() const
+	UINT client_id()
 	{
+		ReadLock lock(mutex_);
 		return client_id_;
 	}
 
@@ -160,7 +161,7 @@ private:
 
 private:
 	boost::asio::ip::tcp::socket socket_;
-	boost::asio::streambuf buf_; //buf to read
+	boost::asio::streambuf buf_; //buf to read, only in reading
 
 	connection_mgr& conn_mgr_;
 
@@ -181,12 +182,27 @@ typedef boost::shared_ptr<session_tcp> connection_ptr;
 class connection_mgr : public boost::noncopyable
 {
 public:
-	connection_mgr();
+	connection_mgr(UINT max_conn);
 
-	void join(connection_ptr incomer)
+	bool can_join()
+	{
+		ReadLock lock(mutex_);
+
+		if (connection_list_.size() > max_conn_)
+			return false;
+		else
+			return true;
+	}
+
+	bool join(connection_ptr incomer)
 	{
 		WriteLock lock(mutex_);
+		if (connection_list_.size() > max_conn_)
+			return false;
+
 		connection_list_.insert(incomer);
+		
+		return true;
 	}
 
 	void leave(connection_ptr outcomer)
@@ -218,9 +234,10 @@ public:
 private:
 	std::set<connection_ptr> connection_list_;
 
+	UINT  max_conn_;  //maximum connections
+
 	boost::shared_mutex mutex_;
 	boost::shared_mutex buffer_mutex_;
-
 
 	boost::circular_buffer<conn_msg*> conn_msg_buffer_;
 };
