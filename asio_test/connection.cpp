@@ -142,18 +142,33 @@ bool conn_msg::set_body(void* pData, size_t nSize)
 	return true;
 }
 //////////////////////////////////////////////////////////////////////////////////
+session_tcp::session_tcp(boost::asio::io_service& ios, connection_mgr& conn_mgr)
+	: socket_(ios)
+	, conn_mgr_(conn_mgr)
+{
+	curr_pack_num_ = 0;
+	client_id_ = 0;
 
+#ifdef _DEBUG
+	output_console("session_tcp constructor[this = 0x%x].", this);
+#endif
+}
+
+session_tcp::~session_tcp()
+{
+#ifdef _DEBUG
+	output_console("session_tcp destructor[this = 0x%x].", this);
+#endif
+}
 
 
 void session_tcp::start(UINT clientid)
 {
 	client_id_ = clientid;
 
-#ifdef _DEBUG
-	output_console("session_tcp::start[this = 0x%x].", this);
-#else
-	output_console("new client accepted");
-#endif
+	output_console("session_tcp::start, remote=%s, local=%s[this = 0x%x].", 
+		remote_address().c_str(), local_address().c_str(), this);
+
 
 	bool bJoin = conn_mgr_.join(shared_from_this());
 	if (!bJoin)
@@ -194,10 +209,6 @@ bool session_tcp::output_console(const char * _Format, ...)
 	}
 	
 
-	
-
-
-
 	return true;
 }
 
@@ -217,6 +228,7 @@ bool session_tcp::output_console(const std::string& str)
 	return true;
 }
 
+//msg will be pushed back into queue and wait for calling
 void session_tcp::write(conn_msg* msg)
 {
 	size_t nSize = 0;
@@ -431,65 +443,37 @@ int session_tcp::ProcessMsg()
 {
 
 	////header is just header_ and body is buf_
-	int nRet = 0;
 
 	//here we only echo back the msg
 	//conn_msg* msg = new conn_msg(header_);
 	conn_msg* msg = conn_mgr_.allocate_msg_buffer(header_);
 	msg->set_body(buf_);
-	write(msg);
 
+	//empty the buf_
 	buf_.consume(buf_.size());
+	
 
-	////dispacth to message handler assording to msg type
-	//switch (header_.type)
-	//{
-	//case 0:
-	//	nRet = ProcessConn();
-	//	break;
-	//case 1:
-	//	nRet = ProcessRequest();
-	//	break;
-	//case 2:
-	//	nRet = ProcessCommand();
-	//	break;
-	//case 3:
-	//	nRet = ProcessPulse();
-	//	break;
-	//case 4:
-	//	nRet = ProcessData();
-	//	break;
-	//default:
-	//	nRet = ProcessConn();
-	//	break;
-	//}
+	//then do the business:msg should be deallocated in ProcessMsg_business 
+	int nRet = ProcessMsg_business(msg);
+	
+
+
 
 	return nRet;
 }
 
-int session_tcp::ProcessConn()
+int session_tcp::ProcessMsg_business(conn_msg* msg)
 {
-	return 0;
-}
 
-int session_tcp::ProcessData()
-{
-	return 0;
-}
+#if ECHO_MSG_IN_SERVER == 1
 
-int session_tcp::ProcessCommand()
-{
+	write(msg);
 	return 0;
-}
 
-int session_tcp::ProcessRequest()
-{
-	return 0;
-}
+#endif //ECHO_MSG_IN_SERVER
 
-int session_tcp::ProcessPulse()
-{
 	return 0;
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -4,6 +4,8 @@
 
 #define MSG_BUFFER_ALLOCATOR  1 //enable the msg buffer allocator or not
 //#define IO_THREAD_IN_CLASS    1 //enable class internal io thread
+#define ECHO_MSG_IN_SERVER   1 //echo back the received msg to client in server class
+
 
 #include <string>
 

@@ -93,24 +93,9 @@ public:
 
 	typedef boost::shared_ptr<session_tcp> pointer;
 
-	session_tcp(boost::asio::io_service& ios, connection_mgr& conn_mgr)
-		: socket_(ios)
-		, conn_mgr_(conn_mgr)
-	{
-		curr_pack_num_ = 0;
-		client_id_ = 0;
-	
-#ifdef _DEBUG
-		output_console("session_tcp constructor[this = 0x%x].", this);
-#endif
-	}
+	session_tcp(boost::asio::io_service& ios, connection_mgr& conn_mgr);
 
-	~session_tcp()
-	{
-#ifdef _DEBUG
-		output_console("session_tcp destructor[this = 0x%x].", this);
-#endif
-	}
+	virtual ~session_tcp();
 
 	static pointer create(boost::asio::io_service& ios, connection_mgr& conn_mgr)
 	{
@@ -131,6 +116,7 @@ public:
 
 	void start(UINT clientid);
 
+	//call Write to send a msg
 	void write(conn_msg* msg);
 
 	bool output_console(const char * _Format, ...);
@@ -138,7 +124,27 @@ public:
 
 public:
 
+	//2017/9/12 yang add get remote address
+	std::string remote_address()
+	{
+		ReadLock lock(mutex_);
+
+		boost::asio::ip::tcp::endpoint ep = socket_.remote_endpoint();
+		
+		//UINT port = ep.port();
+		
+		return ep.address().to_v4().to_string();
+	}
 	
+	//2017/9/12 yang add get local address
+	std::string local_address()
+	{
+		ReadLock lock(mutex_);
+		boost::asio::ip::tcp::endpoint ep = socket_.local_endpoint();
+		
+		//UINT port = ep.port();
+		return ep.address().to_v4().to_string();
+	}
 
 private:
 	
@@ -150,14 +156,12 @@ private:
 	void handler_write_header(boost::system::error_code error);
 	void handler_write_body(boost::system::error_code error);
 	
-
-private:
 	int ProcessMsg();
-	int ProcessConn();
-	int ProcessData();
-	int ProcessCommand();
-	int ProcessRequest();
-	int ProcessPulse();
+
+private: 
+
+	//can override the function to handle own business
+	virtual int ProcessMsg_business(conn_msg* msg);
 
 private:
 	boost::asio::ip::tcp::socket socket_;
